@@ -23,9 +23,12 @@ type Commit struct {
 }
 
 type PageData struct {
-	FileName string
-	Commits  []Commit
-	Active   string
+	FileName    string
+	Commits     []Commit
+	Active      string
+	SearchTerm  string
+	MatchCount  int
+	HasMatches  bool
 }
 
 func promptForConfirmation(prompt string) bool {
@@ -104,14 +107,31 @@ func startServer(fileName string, commits []Commit) error {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		activeHash := r.URL.Query().Get("commit")
+		searchTerm := r.URL.Query().Get("search")
+
 		if activeHash == "" && len(commits) > 0 {
 			activeHash = commits[0].Hash
 		}
 
+		var matchCount int
+		hasMatches := false
+		if searchTerm != "" {
+			for _, commit := range commits {
+				if commit.Hash == activeHash {
+					matchCount = strings.Count(strings.ToLower(commit.Content), strings.ToLower(searchTerm))
+					hasMatches = matchCount > 0
+					break
+				}
+			}
+		}
+
 		data := PageData{
-			FileName: fileName,
-			Commits:  commits,
-			Active:   activeHash,
+			FileName:    fileName,
+			Commits:     commits,
+			Active:      activeHash,
+			SearchTerm:  searchTerm,
+			MatchCount:  matchCount,
+			HasMatches:  hasMatches,
 		}
 
 		err := tmpl.Execute(w, data)
